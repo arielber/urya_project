@@ -1,0 +1,659 @@
+---
+title: "wonderland version of unreal code"
+output: html_notebook
+
+---
+
+```{r setup}
+knitr::opts_knit$set(root.dir = normalizePath("."))
+options('stringsAsFactors'=FALSE)
+```
+
+updating Ureal code to work with wonderland's parameters 
+i decided not to mess with rdas, so all code will be directly in the script .
+
+loading all libraries
+```{r warning=FALSE}
+# loading all libraries
+ library(stringi)
+ library(data.table)
+ library(ggplot2) #ploting tool
+ library(tidyr) #data wrangling tool
+ library(cowplot) #for arranging plots together
+ library(stringi)#for manipulating strings
+ library(dplyr) #dplyr is a grammar of data manipulation, providing a consistent set of verbs that help you solve the most common data manipulation challenges
+ library(tidyverse) #R packages designed for data science
+
+ # study_number<-4 // dont know what this is 
+
+```
+names od domains and conditions used
+
+creating paths
+```{r}
+
+  sub_number <- readline(prompt="Enter subject number: ")
+  study_number <- 4
+  # subject folder must be in the parent folder of r function
+   subject_folder<-paste(dirname(getwd()),'/Subject_data_unreal_04/sub_',sub_number, sep = "")  
+  
+  # 'rating folder' is grandfather folder from code
+  ratings_folder<-dirname(dirname(subject_folder))
+  results_folder<-paste(subject_folder, '/results_sub_',  sub_number , sep ="")
+  
+  # creating easily accessible paths
+  rda_folder<-paste(ratings_folder, '/rdas', sep="")
+
+  #paths[1] is the subject folder
+  #paths[2] is the ratings folder
+  #paths[3] is the results folder
+  #paths[4] is the rdas folder
+  
+  paths<-c(subject_folder,ratings_folder,results_folder,rda_folder)
+  
+```
+
+loading CSV's this section is senstive to orgnzation, if data saving changes this will need modifcation
+```{r warning=FALSE}
+# loading CSV's this section is senstive to orgnzation, if data saving changes this will need modifcation
+  setwd(paths[1])
+  
+  # results_sub_xxx
+
+  trials  <- read.csv(dir()[2],header=FALSE, stringsAsFactors = FALSE)
+  reality_rating <- read.csv(dir()[1],header=TRUE, stringsAsFactors = FALSE)
+  
+  # adding sub name
+  reality_rating <- reality_rating %>% mutate(Subject = sub_number)
+  trials <- trials %>% mutate(Subject = sub_number)
+  
+```
+
+data check - see if input is correct
+```{r}
+#hard codded number of trials 07/12/22
+correct_number_of_rows<-150
+
+#check how many rows there are in the ratings file
+number_of_rows<-nrow(reality_rating)
+if (nrow(reality_rating)==correct_number_of_rows){
+  cat("Number of trials is correct","\n")
+}else if (number_of_rows>correct_number_of_rows) {
+  extra_rows<-number_of_rows-correct_number_of_rows
+  cat(paste("There are", as.character(extra_rows), "more rows than usuall"),"\n")
+  reality_rating<-reality_rating[1:correct_number_of_rows,]
+  cat(paste("There should be",as.character(number_of_rows),"rows"),"\n")
+  cat("The extra rows were removed","\n")
+} else if (number_of_rows < correct_number_of_rows){
+  missing_rows<-correct_number_of_rows-number_of_rows
+  cat(paste("There are", as.character(missing_rows),"missing rows in this file"))
+}
+
+```
+filter data that is not a trial
+```{r}
+# removing id's of non trail codes
+reality_rating<- reality_rating %>% filter (BlockNumber!=777 & BlockNumber!=666 & BlockNumber!=9999 & BlockNumber!=9992 & BlockNumber!=80)
+
+# taking filtered questions
+filter_questions <-reality_rating$QuestionID==1
+reality_rating<-reality_rating[filter_questions,]
+
+#removing unused columns
+reality_rating<-subset(reality_rating, select=-c(TimesatmpInitialDirection,InitialDirection,ProbabilityComment,SessionID,Phase,QuestionID,TimeStampStartQuestion,TimestampEndQuestion,ResponseTime,TimeOfVaseHit,NegativeAnswersCount,PositiveAnswersCount,ConvertedValue,StairCaseValue,ConsequtiveCounter ))
+colnames(reality_rating)[4]<-"RealityRating"
+colnames(reality_rating)[3]<-"ConditionCode"
+colnames(reality_rating)[2]<-"Level"
+colnames(reality_rating)[1]<-"TrialNumber"
+
+reality_rating <- reality_rating %>% mutate(StimVal = RealityRating)
+#save on original just in case
+reality_rating <- reality_rating %>% mutate(org_StimVal = StimVal)
+```
+
+create the names of the conditions and domains of reality_rating
+```{r}
+# creates 2 new columns that are named condtionname and domain
+
+  reality_rating$ConditionName[reality_rating$ConditionCode==29]<-"Delay"
+  reality_rating$ConditionName[reality_rating$ConditionCode==221]<-"Low Gravity"
+  reality_rating$ConditionName[reality_rating$ConditionCode==222]<-"High Gravity"
+  reality_rating$ConditionName[reality_rating$ConditionCode==33]<-"Ripple"
+  reality_rating$ConditionName[reality_rating$ConditionCode==301]<-"Low Saturation"
+  reality_rating$ConditionName[reality_rating$ConditionCode==302]<-"High Saturation"
+  reality_rating$ConditionName[reality_rating$ConditionCode==601]<-"Shrink"
+  reality_rating$ConditionName[reality_rating$ConditionCode==602]<-"Grow"
+  reality_rating$ConditionName[reality_rating$ConditionCode==121]<-"Slow Time"
+  reality_rating$ConditionName[reality_rating$ConditionCode==122]<-"Fast Time"
+  
+  reality_rating$Domain[reality_rating$ConditionCode==29]<-"Self"
+  reality_rating$Domain[reality_rating$ConditionCode==221]<-"Nature"
+  reality_rating$Domain[reality_rating$ConditionCode==222]<-"Nature"
+  reality_rating$Domain[reality_rating$ConditionCode==33]<-"Perception"
+  reality_rating$Domain[reality_rating$ConditionCode==301]<-"Perception"
+  reality_rating$Domain[reality_rating$ConditionCode==302]<-"Perception"
+  reality_rating$Domain[reality_rating$ConditionCode==601]<-"Self"
+  reality_rating$Domain[reality_rating$ConditionCode==602]<-"Self"
+  reality_rating$Domain[reality_rating$ConditionCode==122]<-"Nature"
+  reality_rating$Domain[reality_rating$ConditionCode==121]<-"Nature"
+```
+
+i have no idea why this was done
+```{r}
+#reality_rating<-reality_rating %>% group_by(ConditionName) %>% mutate(Domain = ConditionCode)
+
+#reality_rating<-reality_rating %>% group_by(ConditionCode) %>% mutate(ConditionName = ConditionCode)
+
+```
+
+give ratings to diffrent outcomes per trial, save original data
+
+for some reason may only work if ran line by line
+```{r warning=FALSE}
+
+reality_rating<-reality_rating %>% mutate (TrialType = ConditionName)
+reality_rating$TrialType <- as.character(reality_rating$TrialType) 
+reality_rating$TrialType[reality_rating$TrialType!="Baseline"] <- "Trial"
+
+# something weird happens here with coerced NA's
+reality_rating$Level<-as.numeric(reality_rating$Level)
+reality_rating$ConditionName[reality_rating$Level==0]<-"Baseline"
+# remove rows where the subject did not answer in time
+no_ans_filter <- reality_rating$RealityRating != "NoAnswerInTime"
+reality_rating <- reality_rating[no_ans_filter,]
+
+# some variable editing
+reality_rating$RealityRating<-as.numeric(reality_rating$RealityRating)
+reality_rating$Level<-as.factor(reality_rating$Level)
+
+# Adding condition names
+reality_rating$ConditionName<-factor(reality_rating$ConditionName, levels=c("Grow","Shrink","Delay","Slow Time","Fast Time","Low Gravity","High Gravity","Ripple","Low Saturation","High Saturation","Baseline"))
+
+# Adding domain names
+reality_rating$Domain<-factor(reality_rating$Domain, levels=c("Self","Nature","Perception"))
+
+# Make sure you have a baseline filter df
+baseline_filter<-drop_na(reality_rating %>% filter(TrialType %in% c("Baseline")),any_of("RealityRating"))
+
+average_baseline_rating<-round(mean(baseline_filter$RealityRating),2)
+cat("\n","Average baseline ratings was:",average_baseline_rating,"\n")
+cat("SD of baseline ratings was:",round(sd(baseline_filter$RealityRating),2),"\n")
+
+
+# save original df with unrandomized baseline trials
+original_ratings<-reality_rating
+
+# original code had this blocjed off so leaving it in case later there is a reason to add
+
+#(paths[3])
+#filename<-gsub(" ","",paste("reality_ratings_",sub_number,".csv"))
+#fwrite(original_ratings,paste("original_order_",filename),col.names=TRUE)
+
+
+# check baseline trials after randomized sampling
+org_baseline_filter<-drop_na(original_ratings %>% filter(TrialType %in% c("Baseline")),any_of("RealityRating"))
+
+
+##add column without out layers  
+
+# add adapted_scales column for looking at raw units
+reality_rating<-reality_rating %>% mutate(adapted_scales = StimVal)
+
+# make sure you have a baseline filter df
+baseline_filter<-drop_na(reality_rating %>% filter(ConditionName %in% c("Baseline")),any_of("RealityRating"))
+
+```
+
+arrange trails by what was displayed to the subject
+```{r}
+colnames(trials)<-c("Magnitude","ConditionCode","C","D","E","Height","G","H","I","J","K","Time","M","N","O","P","Q","R","S","T","U","Gravity","Duration","Blackscreen","SlideCode","Show","Codes","AB","Delay","Saturation","AE","AF","Ripple","AH","AI","AJ","sub_num")
+
+trials<-subset(trials, select=-c(C,D,E,G,H,I,J,K,M,N,O,P,Q,R,S,T,U,Duration,Blackscreen,SlideCode,Show,Codes,AB,AE,AF,AH,AI,AJ))
+
+#round the numbers becasue the zeros are distracting
+trials[,3:8]<-round(trials[,3:8],5)
+
+#cleaning out non-stimuli rows
+trials<- trials %>% filter (ConditionCode!=777 & ConditionCode!=666 & ConditionCode!=9999 & ConditionCode!=9992 & ConditionCode!=80 & ConditionCode!=11 & ConditionCode!=22 & ConditionCode!=333 & ConditionCode!=44 & ConditionCode!=55)
+
+#naming conditions and domains
+trials<-trials %>% group_by(ConditionCode) %>% mutate(ConditionName = ConditionCode)
+trials<-trials %>% group_by(ConditionName) %>% mutate(Domain = ConditionCode)
+```
+
+
+
+create the names of the conditions and domains of trails
+```{r}
+# creates 2 new columns that are named condtionname and domain
+
+  trials$ConditionName[trials$ConditionCode==29]<-"Delay"
+  trials$ConditionName[trials$ConditionCode==221]<-"Low Gravity"
+  trials$ConditionName[trials$ConditionCode==222]<-"High Gravity"
+  trials$ConditionName[trials$ConditionCode==33]<-"Ripple"
+  trials$ConditionName[trials$ConditionCode==301]<-"Low Saturation"
+  trials$ConditionName[trials$ConditionCode==302]<-"High Saturation"
+  trials$ConditionName[trials$ConditionCode==601]<-"Shrink"
+  trials$ConditionName[trials$ConditionCode==602]<-"Grow"
+  trials$ConditionName[trials$ConditionCode==121]<-"Slow Time"
+  trials$ConditionName[trials$ConditionCode==122]<-"Fast Time"
+  
+  trials$Domain[trials$ConditionCode==29]<-"Self"
+  trials$Domain[trials$ConditionCode==221]<-"Nature"
+  trials$Domain[trials$ConditionCode==222]<-"Nature"
+  trials$Domain[trials$ConditionCode==33]<-"Perception"
+  trials$Domain[trials$ConditionCode==301]<-"Perception"
+  trials$Domain[trials$ConditionCode==302]<-"Perception"
+  trials$Domain[trials$ConditionCode==601]<-"Self"
+  trials$Domain[trials$ConditionCode==602]<-"Self"
+  trials$Domain[trials$ConditionCode==122]<-"Nature"
+  trials$Domain[trials$ConditionCode==121]<-"Nature"
+```
+
+Creating a 'stimulation Value' column which will represent all the values presented to the subject, in one vector
+
+```{r}
+
+#baseline presentations are defined as 'zero' value for all conditions, so I am going to zero all the values in the trials df that are not a specific condition level
+#change baseline Time value to zero
+trials$Time[trials$Time==1]<-0
+#change baseline Gravity to zero
+trials$Gravity[trials$Gravity==-9.81]<-0
+#make a stim_val column
+trials$StimVal = rowSums(trials[,c("Height","Time","Gravity","Delay","Saturation","Ripple")])
+
+trials$Time[trials$Time==0]<-1
+#change baseline Gravity to zero
+trials$Gravity[trials$Gravity==0]<-(-9.81)
+
+if (any(reality_rating$BlockNumber!=trials$ConditionCode)){
+ cat("### WARNING: There are mismatched trial rows in the file! ###","\n")
+}
+
+```
+
+
+create a folder for results, if running the script , times from this point on, than you must erase the folder "results_sub_m".
+```{r warning=FALSE}
+# create a folder for results based on path that was created
+  try(dir.create(paths[3]))
+```
+
+we have to make sure the baseline values for gravity/time are not zero
+```{r}
+
+low_gravity_rows<-which(reality_rating$original_condition_names == "Low Gravity" & reality_rating$StimVal == 0)
+
+if (length(low_gravity_rows) != 0){reality_rating$StimVal[low_gravity_rows]<-(-9.81)}
+
+
+#add a filename column
+reality_rating<-reality_rating %>% mutate(Filename = dir()[2])
+
+#add a pilot number column
+reality_rating<-reality_rating %>% mutate(Study  = study_number)
+
+#add an outlier detection column
+reality_rating<-reality_rating %>% mutate(Outlier = 0)
+
+
+```
+
+for wonderland removing unneeded iterations taking only needed, if changed at any point change here
+```{r}
+
+ConditionName_vec <- c("Low Gravity","Delay","Ripple", "Baseline")
+
+# plot list
+plot_list<-vector(mode = "list", length=length(ConditionName_vec))
+```
+
+find average rating per condition
+```{r}
+#loop over each condition in Condition Name
+for (i in ConditionName_vec){
+  
+  condition_indices<-which(reality_rating$ConditionName==i)
+  condition_df<-reality_rating[condition_indices,]
+  
+  for (y in unique(as.numeric(condition_df$Level))){
+    #find indices of a level within the entire df
+    condition_and_level_indices<-which(reality_rating$ConditionName==i & reality_rating$Level==y)
+    
+    #find outliers, set at 2STD
+    average_rating<-mean(reality_rating$RealityRating[condition_and_level_indices])
+    sd_ratings<-2*sd(reality_rating$RealityRating[condition_and_level_indices])
+   
+     #calculate the upper and lower limits for each set
+    low_lim<-average_rating-sd_ratings
+    high_lim<-average_rating+sd_ratings
+    
+    #find indices of the outlier values, change the value of outliar to 1
+    for (n in condition_and_level_indices){
+      if(!between(reality_rating$RealityRating[n],low_lim,high_lim)){
+        reality_rating[n,"Outlier"]<-1
+      }
+    }
+  }
+}
+
+#create a data frame with outliers filtered out
+reality_rating_no_outliers<- reality_rating %>% filter (Outlier!=1)
+```
+
+normalizing and saving data frame. one  csv is saved here in folder
+```{r warning=FALSE}
+# max and min non-outlier ratings
+reality_rating<- reality_rating %>% mutate (avg_norm = RealityRating)
+max_rating<-max(reality_rating$RealityRating)
+min_rating<-min(reality_rating$RealityRating)
+mean_rating<-mean(reality_rating$RealityRating)
+
+# normalizing rating as a fraction of 1 n/max(n)
+reality_rating$avg_norm<-(reality_rating$RealityRating-mean_rating)/(max_rating-min_rating)
+
+# creating z_scores
+reality_rating<- reality_rating %>% mutate (z_score = RealityRating)
+sd_rating<-sd(reality_rating$RealityRating)
+reality_rating$z_score<-(reality_rating$RealityRating-mean_rating)/sd_rating
+
+#rounding some columns
+reality_rating$avg_norm<-round(reality_rating$avg_norm,digits = 4)
+reality_rating$z_score<-round(reality_rating$z_score,digits = 4)
+```
+
+```{r}
+# add exclusion criteria 
+exlusion_criteria = 0
+
+# when turning catgory into integer the system adds 1 so it starts from 1 and not 0
+base_lv = min(as.integer(reality_rating$Level)) - 1
+
+max_lv = max(as.integer(reality_rating$Level)) -1
+
+# looking for base line mean and highest alteration mean
+base_line_ratings = mean(reality_rating$RealityRating[reality_rating$Level == base_lv])
+highest_lv_ratings = mean(reality_rating$RealityRating[reality_rating$Level == max_lv])
+
+# counting how many conditions got through
+numof_condions = table(reality_rating$ConditionName)
+exlude_condition = numof_condions >= 4
+exlude_condition = names(exlude_condition[exlude_condition == TRUE])
+exlude_condition = paste ("met criteria of 4 instences:", toString(paste(exlude_condition)))
+
+# creating exclusion veriable
+
+if ((base_line_ratings - highest_lv_ratings < 10)||(base_line_ratings < 60)){
+  exlusion_criteria = 1
+}
+```
+
+
+```{r warning=FALSE}
+#save the new data frames you created
+setwd(paths[3])
+if (exlusion_criteria == 0){
+  filename<-gsub(" ","",paste("reality_ratings_",sub_number,".csv"))
+} else {
+  filename<-gsub(" ","",paste("exluded reality_ratings_",sub_number,".csv"))
+}
+
+fwrite(reality_rating,filename,col.names=TRUE)
+```
+
+
+plotting with outliyers
+Basic plot of ratings without normalization
+```{r warning=FALSE}
+# change stimval into a integer for calculations
+
+setwd(paths[3])
+
+reality_rating$StimVal = as.integer(reality_rating$StimVal)
+
+for (x in 1:length(ConditionName_vec)){
+  # filter out the rows of the current condition
+  current_cond<-reality_rating[reality_rating$ConditionName==ConditionName_vec[x],]
+  
+  # trials filtered by domain
+  current_domain<-current_cond$Domain[1]
+  
+  # domain by specific condition
+  current_base_stimval<-reality_rating[reality_rating$ConditionName == ConditionName_vec[x],]
+  
+  # baseline will be lowest lv
+  current_base_stimval<-current_base_stimval[current_base_stimval$Level==1,]
+  
+  # baseline of stimulus will be average stimulation per group
+  current_base_stimval<-mean(current_base_stimval$StimVal)
+  
+  # all plots start at base line
+  current_baseline_filter<-baseline_filter
+  current_baseline_filter$StimVal<-current_base_stimval
+  current_baseline_filter$Domain<-current_domain
+  
+  # making a plot, no need for some colomn
+  current_cond<-rbind(current_cond[,1:11],current_baseline_filter)
+
+  #plot by level of alteration and add to plot list
+  plot_list[[x]]<- ggplot(current_cond, aes(x=Level, y=RealityRating,fill=Domain)) +
+    geom_boxplot(position="dodge",color="black",outlier.shape = NA)+guides(fill=FALSE)+
+    scale_fill_manual(values = c("Nature" = "springgreen3","Perception"="slateblue3","Self"="indianred2"))+
+    scale_color_manual(values=c("#00ff00")) + 
+    geom_jitter(color="black", width=0.15, alpha=0.95) +
+    geom_smooth(formula= y~x,method = "loess", se=TRUE, level=0.95, alpha=.55,aes(group=1),color="navy") +
+    ylab("Rating")+
+    ylim(0,100)+
+    ############################# change lv in wonderland_02 ##################
+    
+    scale_x_discrete(labels = c('Base','1','2','3','4')) +
+    theme_classic(base_size= 12)+
+    theme(axis.text=element_text(face="bold",color="black",size=6),axis.title=element_text(face="bold",color="black",size=7,vjust=-1),plot.title =element_text(face="bold",color="black",size=9,hjust=0.5,vjust=-1) )+
+    ggtitle(ConditionName_vec[x])
+}
+
+#saving the grid
+if (exlusion_criteria == 0){
+  png_title<-paste("Sub",as.character(sub_number), "Average Ratings.png")
+} else {
+  png_title<-paste("Sub",as.character(sub_number), "exluded Average Ratings.png")
+}
+
+final_plot<-cowplot::plot_grid(plotlist = plot_list,nrow=1,ncol=4, rel_heights = c(1,1),greedy=TRUE)
+#show the plot
+final_plot+draw_figure_label(paste("Sub",as.character(sub_number),"average", exlude_condition),position = "bottom.left" ,size=8,fontface = "bold")
+#save the plot
+ggsave(png_title,scale=1,width=29,height=15,units="cm",dpi=600)
+
+
+```
+
+Ratings with Raw Unity Values
+```{r  warning=FALSE}
+setwd(paths[3])
+
+for (x in 1:length(ConditionName_vec)){
+  #filter out the rows of the current condition
+  current_cond<-reality_rating[reality_rating$ConditionName==ConditionName_vec[x],]
+  
+  # trials filtered by domain
+  current_domain<-current_cond$Domain[1]
+  
+  # trial domain by specific condition 
+  current_base_stimval<-reality_rating[reality_rating$ConditionName==ConditionName_vec[x],]
+  
+  # baseline will be lowest lv
+  current_base_stimval<-current_base_stimval[current_base_stimval$Level==1,]
+  
+  # baseline of stimulus will be average stimulation per group
+  current_base_stimval<-mean(current_base_stimval$StimVal)
+  
+  # all plots start at base line
+  current_baseline_filter<-baseline_filter
+  current_baseline_filter$StimVal<-current_base_stimval
+  current_baseline_filter$Domain<-current_domain
+  
+  # making a plot, no need for some colomn
+  current_cond<-rbind(current_cond[,1:11],current_baseline_filter)
+  
+  #we are currently not removing outliers, under the assumption that all ratings are valid judgments (13.7.22 Gadi)
+  
+  
+  #current_cond<-remove_outliers(current_cond)
+  #plot by level of alteration and add to plot list
+  plot_list[[x]]<-ggplot(current_cond, aes(x=as.factor(StimVal), y=RealityRating,fill=Domain)) +
+    geom_boxplot(position="dodge",color="black",outlier.shape = NA)+guides(fill=FALSE)+
+    scale_fill_manual(values = c("Nature" = "springgreen3","Perception"="slateblue3","Self"="indianred2"))+
+    scale_color_manual(values=c("#00ff00")) + 
+    geom_jitter(width=.15,alpha=.95)+
+    geom_smooth(formula= y~x,method = "loess", se=TRUE, level=0.95, alpha=.55,aes(group=1),color="navy") +
+    ylab("Rating")+
+    ylim(0,100)+
+    xlab("Unity")+
+    theme_classic(base_size= 12)+
+    theme(axis.text=element_text(face="bold",color="black",size=6),axis.title=element_text(face="bold",color="black",size=7,vjust=-1),plot.title =element_text(face="bold",color="black",size=11,hjust=0.5,vjust=-1) )+
+    ggtitle(current_cond$ConditionName[1])
+ 
+  # reverse so that it reads left to right
+  plot_list[[x]]<-plot_list[[x]]+scale_x_discrete(limits=rev)
+}
+
+
+
+if (exlusion_criteria == 0){
+  png_title<-paste("Sub",as.character(sub_number), " Ratings ~ Raw.png")
+} else{
+  png_title<-paste("Sub",as.character(sub_number), "exluded Ratings ~ Raw.png")
+}
+final_plot_3<-cowplot::plot_grid(plotlist = plot_list,nrow=1,ncol=3,rel_heights = c(1,1),greedy=TRUE)
+#show the plot
+final_plot_3+draw_figure_label(paste("Sub",as.character(sub_number)," Ratings ~ Raw", exlude_condition),position = "bottom.left" ,size=8,fontface = "bold")
+#save the plot
+ggsave(png_title,scale=1,width=29,height=8,units="cm",dpi=600)
+
+```
+
+plotting without outliyers
+Basic plot of ratings without normalization
+
+```{r  warning=FALSE}
+
+setwd(paths[3])
+for (x in 1:length(ConditionName_vec)){
+  #filter out the rows of the current condition
+  current_cond<-reality_rating_no_outliers[reality_rating_no_outliers$ConditionName==ConditionName_vec[x],]
+  
+  # trials filtered by domain
+  current_domain<-current_cond$Domain[1]
+  
+  # trial domain by specific condition 
+  current_base_stimval<-reality_rating_no_outliers[reality_rating_no_outliers$original_condition_names==ConditionName_vec[x],]
+  
+  # baseline will be lowest lv
+  current_base_stimval<-current_base_stimval[current_base_stimval$Level==1,]
+  
+  # baseline of stimulus will be average stimulation per group
+  current_base_stimval<-mean(current_base_stimval$StimVal)
+  
+  # all plots start at base line
+  current_baseline_filter<-baseline_filter
+  current_baseline_filter$StimVal<-current_base_stimval
+  current_baseline_filter$Domain<-current_domain
+  
+  # making a plot, no need for some colomn
+  current_cond<-rbind(current_cond[,1:11],current_baseline_filter)
+  
+  #not removing outliers
+  #current_cond<-remove_outliers(current_cond)
+  #plot by level of alteration and add to plot list
+  plot_list[[x]]<- ggplot(current_cond, aes(x=Level, y=RealityRating,fill=Domain)) +
+    geom_boxplot(position="dodge",color="black",outlier.shape = NA)+guides(fill=FALSE)+
+    scale_fill_manual(values = c("Nature" = "springgreen3","Perception"="slateblue3","Self"="indianred2"))+
+    scale_color_manual(values=c("#00ff00")) + 
+    geom_jitter(color="black", width=0.15, alpha=0.95) +
+    geom_smooth(formula= y~x,method = "loess", se=TRUE, level=0.95, alpha=.55,aes(group=1),color="navy") +
+    ylab("Rating")+
+    ylim(0,100)+
+    scale_x_discrete(labels = c('Base','1','2','3','4')) +
+    theme_classic(base_size= 12)+
+    theme(axis.text=element_text(face="bold",color="black",size=6),axis.title=element_text(face="bold",color="black",size=7,vjust=-1),plot.title =element_text(face="bold",color="black",size=9,hjust=0.5,vjust=-1) )+
+    ggtitle(current_cond$ConditionName[1])
+}
+
+#saving the grid
+if(exlusion_criteria == 0){
+  png_title<-paste("Sub",as.character(sub_number), "Average Ratings no outliers.png")
+} else  {
+  png_title<-paste("Sub",as.character(sub_number), "exluded Average Ratings no outliers.png")
+}
+
+final_plot<-cowplot::plot_grid(plotlist = plot_list,nrow=1,ncol=3,rel_heights = c(1,1),greedy=TRUE)
+#show the plot
+final_plot+draw_figure_label(paste("Sub",as.character(sub_number),"average", exlude_condition),position = "bottom.left" ,size=8,fontface = "bold")
+#save the plot
+ggsave(png_title,scale=1,width=29,height=15,units="cm",dpi=600)
+```
+
+Ratings with Raw Unity Values, without outliers
+```{r  warning=FALSE}
+setwd(paths[3])
+for (x in 1:length(ConditionName_vec)){
+  #filter out the rows of the current condition
+  current_cond<-reality_rating_no_outliers[reality_rating_no_outliers$ConditionName==ConditionName_vec[x],]
+  
+  # trials filtered by domain
+  current_domain<-current_cond$Domain[1]
+  
+  # trial domain by specific condition 
+  current_base_stimval<-reality_rating_no_outliers[reality_rating_no_outliers$original_condition_names==ConditionName_vec[x],]
+  
+  # baseline will be lowest lv
+  current_base_stimval<-current_base_stimval[current_base_stimval$Level==1,]
+  
+  # baseline will be lowest lv
+  current_base_stimval<-mean(current_base_stimval$StimVal)
+  
+  # baseline of stimulus will be average stimulation per group
+  current_baseline_filter<-baseline_filter
+  current_baseline_filter$StimVal<-current_base_stimval
+  current_baseline_filter$Domain<-current_domain
+  
+  # making a plot, no need for some colomn
+  current_cond<-rbind(current_cond[,1:11],current_baseline_filter)
+  
+  #we are currently not removing outliers, under the assumption that all ratings are valid judgments (13.7.22 Gadi)
+  #plot by level of alteration and add to plot list
+  plot_list[[x]]<-ggplot(current_cond, aes(x=as.factor(StimVal), y=RealityRating,fill=Domain)) +
+    geom_boxplot(position="dodge",color="black",outlier.shape = NA)+guides(fill=FALSE)+
+    scale_fill_manual(values = c("Nature" = "springgreen3","Perception"="slateblue3","Self"="indianred2"))+
+    scale_color_manual(values=c("#00ff00")) + 
+    geom_jitter(width=.15,alpha=.95)+
+    geom_smooth(formula= y~x,method = "loess", se=TRUE, level=0.95, alpha=.55,aes(group=1),color="navy") +
+    ylab("Rating")+
+    ylim(0,100)+
+    xlab("Unity")+
+    theme_classic(base_size= 12)+
+    theme(axis.text=element_text(face="bold",color="black",size=6),axis.title=element_text(face="bold",color="black",size=7,vjust=-1),plot.title =element_text(face="bold",color="black",size=11,hjust=0.5,vjust=-1) )+
+    ggtitle(current_cond$ConditionName[1])
+  
+  # reverse so that it reads left to right
+  plot_list[[x]]<-plot_list[[x]]+scale_x_discrete(limits=rev)
+}
+
+
+#saving the grid
+if (exlusion_criteria == 0){
+  png_title<-paste("Sub",as.character(sub_number), " Ratings raw unity no outliers.png")
+} else{
+  png_title<-paste("Sub",as.character(sub_number), " exluded Ratings raw unity no outliers.png")
+}
+
+final_plot_3<-cowplot::plot_grid(plotlist = plot_list,nrow=1,ncol=4,rel_heights = c(1,1),greedy=TRUE)
+#show the plot
+final_plot_3+draw_figure_label(paste("Sub",as.character(sub_number)," Ratings ~ Raw",exlude_condition),position = "bottom.left" ,size=8,fontface = "bold")
+#save the plot
+ggsave(png_title,scale=1,width=29,height=8,units="cm",dpi=600)
+```
+
+
+
