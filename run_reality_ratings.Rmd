@@ -56,17 +56,19 @@ creating paths
 loading CSV's this section is senstive to orgnzation, if data saving changes this will need modifcation
 ```{r warning=FALSE}
 # loading CSV's this section is senstive to orgnzation, if data saving changes this will need modifcation
-  setwd(paths[3])
+  setwd(paths[1])
   
   
   # results_sub_xxx
 
-  trials  <- read.csv(dir()[2],header=FALSE, stringsAsFactors = FALSE)
-  reality_rating <- read.csv(dir()[1],header=TRUE, stringsAsFactors = FALSE)
+  trials  <- read.exe(dir()[2],header=FALSE, stringsAsFactors = FALSE)
+  reality_rating <- read.exe(dir()[1],header=TRUE, stringsAsFactors = FALSE)
   
   # adding sub name
   reality_rating <- reality_rating %>% mutate(Subject = sub_number)
   trials <- trials %>% mutate(Subject = sub_number)
+
+  setwd(paths[2])
   
 ```
 
