@@ -56,7 +56,7 @@ creating paths
 loading CSV's this section is senstive to orgnzation, if data saving changes this will need modifcation
 ```{r warning=FALSE}
 # loading CSV's this section is senstive to orgnzation, if data saving changes this will need modifcation
-  setwd(paths[3])
+  setwd(paths[4])
   
   
   # results_sub_xxx
