@@ -57,6 +57,7 @@ loading CSV's this section is senstive to orgnzation, if data saving changes thi
 ```{r warning=FALSE}
 # loading CSV's this section is senstive to orgnzation, if data saving changes this will need modifcation
   setwd(paths[1])
+  setwd(paths[2])
   
   # results_sub_xxx
 
